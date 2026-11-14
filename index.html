@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CutPulse — Local Browser-Based AI Beat-Sync Video Editor</title>
+  <meta name="description" content="Auto-edit Shorts, Reels, and TikToks to music beats directly in your browser. 100% client-side WASM processing with zero server uploads." />
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- FFmpeg.wasm UMD Libraries (Client-Side Video Engine) -->
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            carbon: {
+              950: '#09090B',
+              900: '#121215',
+              850: '#18181B',
+              800: '#27272A',
+              700: '#3F3F46',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root { --bg: #09090B; --surface: #111114; --elevated: #18181B; }
+    html, body { min-height: 100%; }
+    body {
+      background-color: var(--bg);
+      color: #FAFAFA;
+      -webkit-font-smoothing: antialiased;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    ::selection { background: rgba(124, 58, 237, 0.35); color: #fff; }
+
+    /* App shell: locked viewport on desktop, natural flow on mobile */
+    .app-shell { height: 100vh; overflow: hidden; }
+    @media (max-width: 767px) {
+      .app-shell { height: auto; overflow: visible; }
+    }
+
+    /* Thin dark scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.18); }
+
+    /* Accent gradient + glow */
+    .accent-gradient { background: linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%); }
+    .accent-glow:hover:not(:disabled) { box-shadow: 0 0 28px rgba(124, 58, 237, 0.5); }
+
+    /* Studio spotlight background for center stage */
+    .spotlight {
+      background:
+        radial-gradient(ellipse 70% 55% at 50% 38%, rgba(124, 58, 237, 0.10) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 50% 100%, rgba(79, 70, 229, 0.06) 0%, transparent 60%),
+        #09090B;
+    }
+
+    /* Active state glow for selectable cards */
+    .preset-option.border-violet-500,
+    .style-option.border-violet-500 {
+      box-shadow: 0 0 0 1px #7C3AED, 0 0 18px rgba(124, 58, 237, 0.25);
+      background-color: rgba(124, 58, 237, 0.06);
+    }
+
+    /* Glass top bar */
+    .glass { background: rgba(9, 9, 11, 0.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+
+    /* Device viewport frame shadow */
+    .device-frame { box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08); }
+
+    /* Subtle dot grid for center viewport */
+    .viewport-grid {
+      background-color: #0C0C0E;
+      background-image: radial-gradient(#27272A 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+
+    /* Hairline utility */
+    .hairline { border: 1px solid rgba(255, 255, 255, 0.07); }
+
+    /* Prevent scroll chaining in panels */
+    .panel-scroll { overscroll-behavior: contain; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- APP SHELL -->
+  <div class="app-shell flex flex-col">
+
+    <!-- TOP BAR (56px) -->
+    <header class="h-[56px] glass border-b border-white/[0.07] flex items-center justify-between px-4 lg:px-6 shrink-0 z-50">
+      <!-- Left: Brand -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-md accent-gradient flex items-center justify-center shadow-[0_0_12px_rgba(124,58,237,0.35)]">
+          <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M4 12h4l3-8 4 16 3-8h2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="font-semibold tracking-tight text-sm text-white">CutPulse</span>
+        <span class="hidden sm:inline font-mono text-[10px] tracking-wider uppercase px-2 py-0.5 rounded bg-white/5 border border-white/[0.07] text-zinc-400">Studio</span>
+      </div>
+
+      <!-- Right: Status pills + Export -->
+      <div class="flex items-center gap-2">
+        <div class="hidden md:flex items-center gap-2">
+          <span class="rounded-full px-2.5 py-1 text-[11px] font-medium text-zinc-300 flex items-center gap-1.5 hairline bg-[#111114]">
+            <span id="engineIndicator" class="relative flex h-1.5 w-1.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+            </span>
+            Client-Side Engine Ready
+          </span>
+          <span class="rounded-full px-2.5 py-1 text-[11px] font-mono text-amber-400 hairline bg-[#111114]">
+            Beats: <span id="telemetryBeats">0</span>
+          </span>
+          <span class="rounded-full px-2.5 py-1 text-[11px] font-medium text-zinc-400 hairline bg-[#111114]">
+            Privacy: Local RAM
+          </span>
+        </div>
+
+        <!-- Export Video (downloadBtn kept intact) -->
+        <button id="downloadBtn" type="button" disabled title="No watermark • Direct local export"
+          class="ml-1 px-3.5 py-1.5 rounded-md bg-white/5 border border-white/[0.07] text-zinc-500 text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          <span>Export Video</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- TWO-COLUMN BODY -->
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+
+      <!-- LEFT INSPECTOR PANEL (380px) -->
+      <aside class="w-full lg:w-[380px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.07] bg-[#111114] flex flex-col overflow-hidden max-h-[62vh] lg:max-h-none">
+        <!-- Scrollable steps -->
+        <div class="flex-1 overflow-y-auto panel-scroll px-5 py-5 space-y-6 min-h-0">
+
+          <!-- Step 1: Source Video -->
+          <div>
+            <div class="flex items-center justify-between mb-2.5">
+              <label class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">1. Source Video</label>
+              <span class="font-mono text-[10px] text-zinc-500">MP4 / MOV / WEBM</span>
+            </div>
+            <label id="videoDropzone" for="videoInput"
+              class="flex flex-col items-center justify-center w-full h-28 border border-dashed border-white/15 hover:border-violet-500/60 bg-[#18181B]/40 hover:bg-violet-500/5 rounded-lg cursor-pointer transition-all p-4 text-center group">
+              <svg class="w-5 h-5 text-zinc-400 mb-2 group-hover:text-violet-400 transition-colors" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+              </svg>
+              <span class="text-sm font-medium text-zinc-200">Drop video clip or click to browse</span>
+              <span class="text-[11px] text-zinc-500 mt-1">Processed locally in your browser RAM</span>
+              <input id="videoInput" type="file" accept="video/mp4,video/quicktime,video/webm" class="hidden" />
+            </label>
+
+            <div id="videoFileCard" class="hidden bg-[#18181B] hairline rounded-lg p-3 flex items-center justify-between mt-2">
+              <div class="min-w-0 pr-3">
+                <p id="videoFileName" class="text-sm font-medium text-zinc-100 truncate">clip.mp4</p>
+                <p id="videoFileMeta" class="font-mono text-xs text-zinc-400 mt-0.5">00:00 • 0.0 MB</p>
+              </div>
+              <button id="removeVideoBtn" type="button" class="text-xs font-medium text-zinc-400 hover:text-zinc-100 px-2.5 py-1.5 rounded bg-white/5 hover:bg-white/10 transition-colors">
+                Change
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Audio & Rhythm -->
+          <div class="pt-5 border-t border-white/[0.07]">
+            <div class="flex items-center justify-between mb-2.5">
+              <label class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">2. Audio & Rhythm</label>
+              <div class="flex bg-[#18181B] p-0.5 rounded-md border border-white/[0.07] text-xs">
+                <button type="button" id="tabPresetBtn" class="px-2.5 py-1 rounded bg-white/10 text-zinc-100 font-medium transition-colors">Preset Beats</button>
+                <button type="button" id="tabUploadBtn" class="px-2.5 py-1 rounded text-zinc-400 hover:text-zinc-200 transition-colors">Upload MP3</button>
+              </div>
+            </div>
+
+            <div id="presetBeatsPanel" class="space-y-2">
+              <button type="button" data-preset="phonk"
+                class="preset-option w-full text-left p-3 rounded-lg bg-[#18181B] border border-violet-500 flex items-center justify-between transition-all group">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-md bg-white/5 flex items-center justify-center text-violet-400 shrink-0">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-zinc-100">Phonk Drift</p>
+                    <p class="text-[11px] text-zinc-400">Synthesized 808 bass • Fast cuts</p>
+                  </div>
+                </div>
+                <span class="font-mono text-xs px-2 py-0.5 rounded bg-white/5 text-amber-400 shrink-0">130 BPM</span>
+              </button>
+
+              <button type="button" data-preset="trap"
+                class="preset-option w-full text-left p-3 rounded-lg bg-[#18181B] border border-white/[0.07] hover:border-violet-500/40 flex items-center justify-between transition-all">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-md bg-white/5 flex items-center justify-center text-violet-400 shrink-0">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z"/></svg>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-zinc-100">High-Energy Trap</p>
+                    <p class="text-[11px] text-zinc-400">Punchy kick & snare • Dynamic</p>
+                  </div>
+                </div>
+                <span class="font-mono text-xs px-2 py-0.5 rounded bg-white/5 text-zinc-300 shrink-0">145 BPM</span>
+              </button>
+
+              <button type="button" data-preset="silence"
+                class="preset-option w-full text-left p-3 rounded-lg bg-[#18181B] border border-white/[0.07] hover:border-violet-500/40 flex items-center justify-between transition-all">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-md bg-white/5 flex items-center justify-center text-violet-400 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-zinc-100">Clean Cut (Auto-Silence)</p>
+                    <p class="text-[11px] text-zinc-400">Removes dead air from original audio</p>
+                  </div>
+                </div>
+                <span class="font-mono text-xs px-2 py-0.5 rounded bg-white/5 text-zinc-300 shrink-0">VAD</span>
+              </button>
+            </div>
+
+            <div id="uploadAudioPanel" class="hidden">
+              <label for="audioInput" class="flex items-center justify-between w-full p-3.5 border border-dashed border-white/15 hover:border-violet-500/60 bg-[#18181B] rounded-lg cursor-pointer transition-all">
+                <div class="min-w-0 pr-2">
+                  <p id="audioFileName" class="text-sm font-medium text-zinc-200 truncate">Select MP3 or WAV track</p>
+                  <p class="text-[11px] text-zinc-500 mt-0.5">Low-pass bass peak detection</p>
+                </div>
+                <span class="text-xs font-medium px-2.5 py-1.5 rounded bg-white/5 text-zinc-200 shrink-0">Browse</span>
+                <input id="audioInput" type="file" accept="audio/*" class="hidden" />
+              </label>
+            </div>
+          </div>
+
+          <!-- Step 3: Edit Style -->
+          <div class="pt-5 border-t border-white/[0.07]">
+            <label class="block text-[11px] font-semibold uppercase tracking-wider text-zinc-400 mb-2.5">3. Edit Style</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" data-style="Beat Cut"
+                class="style-option p-2.5 rounded-lg bg-[#18181B] border border-violet-500 text-left transition-all">
+                <p class="text-xs font-semibold text-zinc-100">Beat Cut</p>
+                <p class="text-[10px] text-zinc-400 mt-0.5 leading-tight">Hard cuts on kicks</p>
+              </button>
+              <button type="button" data-style="Punch + Flash"
+                class="style-option p-2.5 rounded-lg bg-[#18181B] border border-white/[0.07] hover:border-white/20 text-left transition-all">
+                <p class="text-xs font-semibold text-zinc-100">Punch + Flash</p>
+                <p class="text-[10px] text-zinc-400 mt-0.5 leading-tight">1.15x zoom & flash</p>
+              </button>
+              <button type="button" data-style="9:16 Auto-Center"
+                class="style-option p-2.5 rounded-lg bg-[#18181B] border border-white/[0.07] hover:border-white/20 text-left transition-all">
+                <p class="text-xs font-semibold text-zinc-100">9:16 Center</p>
+                <p class="text-[10px] text-zinc-400 mt-0.5 leading-tight">AI face tracking</p>
+              </button>
+            </div>
+          </div>
+
+          <!-- Compact Engine Status (IDs preserved) -->
+          <div class="pt-5 border-t border-white/[0.07]">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Engine Status</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            </div>
+            <dl class="space-y-1.5 font-mono text-[11px]">
+              <div class="flex justify-between">
+                <dt class="text-zinc-500">WASM Core:</dt>
+                <dd id="telemetryCore" class="text-zinc-200">Standby</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-zinc-500">AI Vision:</dt>
+                <dd id="telemetryVision" class="text-zinc-200">MediaPipe Ready</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-zinc-500">Subject Lock:</dt>
+                <dd id="telemetryCrop" class="text-zinc-200">Center (50%)</dd>
+              </div>
+              <div class="flex justify-between">
+                <dt class="text-zinc-500">Active Style:</dt>
+                <dd id="telemetryStyle" class="text-zinc-200">Beat Cut</dd>
+              </div>
+            </dl>
+          </div>
+
+          <!-- Status text (id preserved) -->
+          <p id="statusText" class="font-mono text-[11px] text-center text-zinc-500 pt-2">
+            Ready • Waiting for source media
+          </p>
+        </div>
+
+        <!-- STICKY BOTTOM ACTION -->
+        <div class="shrink-0 p-4 border-t border-white/[0.07] bg-[#111114] space-y-2.5">
+          <!-- Progress Track -->
+          <div id="progressWrapper" class="hidden w-full bg-[#18181B] h-1.5 rounded-full overflow-hidden border border-white/[0.07]">
+            <div id="progressBar" class="bg-amber-400 h-full w-0 transition-all duration-200"></div>
+          </div>
+
+          <button id="generateBtn" type="button"
+            class="w-full py-3 px-4 rounded-lg accent-gradient hover:opacity-95 active:scale-[0.99] text-white font-semibold text-sm tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer accent-glow disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M11.983 1.907a.75.75 0 00-1.292-.657l-8.5 9.5A.75.75 0 002.75 12h6.572l-1.305 6.093a.75.75 0 001.292.657l8.5-9.5A.75.75 0 0017.25 8h-6.572l1.305-6.093z"/>
+            </svg>
+            <span id="generateBtnText">Generate Auto-Edit</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- MAIN STAGE / CENTER CANVAS -->
+      <main class="flex-1 spotlight flex flex-col items-center justify-center overflow-hidden relative px-6 py-6 min-h-0">
+        <div class="flex flex-col items-center w-full">
+          <!-- Viewport header -->
+          <div class="flex items-center justify-between w-full max-w-[300px] mb-3">
+            <span id="monitorModeLabel" class="font-mono text-[11px] text-zinc-400 tracking-wider">PREVIEW MONITOR [9:16]</span>
+            <span id="resolutionBadge" class="font-mono text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/[0.07] text-zinc-400">
+              720 × 1280 HD
+            </span>
+          </div>
+
+          <!-- 9:16 floating device viewport -->
+          <div class="relative w-[260px] sm:w-[280px] aspect-[9/16] bg-black border border-white/[0.08] rounded-2xl overflow-hidden device-frame flex items-center justify-center">
+            <!-- Inner safe-zone guide -->
+            <div class="absolute inset-3 border border-white/5 rounded-xl pointer-events-none z-10"></div>
+
+            <!-- Placeholder -->
+            <div id="viewportPlaceholder" class="text-center px-5 z-10">
+              <div class="w-12 h-12 rounded-full bg-white/5 border border-white/[0.07] flex items-center justify-center mx-auto mb-3 text-zinc-500">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/>
+                </svg>
+              </div>
+              <p class="text-xs font-medium text-zinc-300">9:16 Vertical Canvas</p>
+              <p class="text-[11px] text-zinc-500 mt-1">Load a video to preview framing & beat markers</p>
+            </div>
+
+            <!-- Live video + tracking canvas -->
+            <video id="previewVideo" class="hidden w-full h-full object-cover" playsinline muted loop></video>
+            <canvas id="trackingCanvas" class="hidden absolute inset-0 w-full h-full pointer-events-none"></canvas>
+
+            <!-- Top overlay: frame badge + timestamp -->
+            <div class="absolute top-3 left-3 right-3 flex justify-between items-center pointer-events-none z-20">
+              <span id="frameBadge" class="font-mono text-[9px] text-zinc-300 bg-black/60 backdrop-blur px-1.5 py-0.5 rounded border border-white/[0.1]">RAW INPUT</span>
+              <span id="liveTimer" class="font-mono text-[9px] text-amber-400 bg-black/60 backdrop-blur px-1.5 py-0.5 rounded border border-white/[0.1]">00:00.0</span>
+            </div>
+          </div>
+
+          <!-- Audio transients & beat timeline -->
+          <div class="w-full max-w-[420px] mt-6">
+            <div class="flex items-center justify-between font-mono text-[10px] text-zinc-500 mb-1.5">
+              <span>AUDIO TRANSIENTS</span>
+              <span id="beatTimelineLabel">0 CUTS MAPPED</span>
+            </div>
+            <div id="waveformBar" class="h-12 w-full bg-black/40 border border-white/[0.07] rounded-lg relative overflow-hidden flex items-center px-3 gap-1">
+              <div class="w-full h-[1px] bg-white/10"></div>
+            </div>
+            <p class="text-[11px] text-zinc-500 mt-2 text-center">No watermark • Direct local export</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- Minimal collapsible ad banner at the very bottom -->
+    <div id="adBanner" class="shrink-0 border-t border-white/[0.07] bg-[#111114] px-4 py-2 flex items-center justify-center gap-3">
+      <span class="font-mono text-[9px] tracking-widest uppercase text-zinc-600 shrink-0">Advertisement</span>
+      <div id="adSlot" class="flex-1 max-w-[728px] h-10 bg-[#09090B] border border-white/[0.07] rounded flex items-center justify-center">
+        <span class="font-mono text-[10px] text-zinc-600">AdSense Banner Slot (728 × 90)</span>
+      </div>
+      <button type="button" id="adBannerToggle" class="text-[10px] text-zinc-500 hover:text-zinc-300 shrink-0 transition-colors">Hide</button>
+    </div>
+  </div>
+
+  <!-- BELOW THE FOLD: SEO & ADSENSE CONTENT SHIELD -->
+  <section class="border-t border-white/[0.07] bg-[#111114]/40 py-14 px-4 lg:px-6">
+    <div class="max-w-5xl mx-auto space-y-12">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="bg-[#111114] hairline rounded-xl p-5">
+          <h2 class="text-sm font-semibold text-zinc-100 mb-2">Zero-Latency Local Rendering</h2>
+          <p class="text-xs text-zinc-400 leading-relaxed">Traditional cloud editors force you to upload gigabytes of raw footage and wait in render queues. CutPulse compiles WebAssembly video pipelines directly inside your browser for instant local processing.</p>
+        </div>
+        <div class="bg-[#111114] hairline rounded-xl p-5">
+          <h2 class="text-sm font-semibold text-zinc-100 mb-2">Transient Audio Peak Detection</h2>
+          <p class="text-xs text-zinc-400 leading-relaxed">Our Web Audio analyzer filters sub-140Hz bass frequencies across kick and snare channels, mapping millisecond-accurate timestamps so every scene transition lands cleanly on the beat.</p>
+        </div>
+        <div class="bg-[#111114] hairline rounded-xl p-5">
+          <h2 class="text-sm font-semibold text-zinc-100 mb-2">Smart 9:16 Subject Framing</h2>
+          <p class="text-xs text-zinc-400 leading-relaxed">Convert horizontal 16:9 widescreen clips into vertical Shorts and Reels effortlessly. Computer-vision landmark tracking keeps speakers and high-motion action locked in the center frame.</p>
+        </div>
+      </div>
+
+      <div class="bg-[#111114] hairline rounded-xl p-6 md:p-8">
+        <h2 class="text-lg font-semibold text-zinc-100 mb-2">How Browser-Based Beat-Sync Editing Works</h2>
+        <p class="text-sm text-zinc-400 leading-relaxed mb-6">CutPulse combines three native browser technologies—MediaPipe Vision, Web Audio API, and client-side WebAssembly—to automate repetitive timeline cutting without cloud servers. When you load a video and select a rhythm profile, the engine extracts audio transient peaks, identifies high-motion visual frames, and aligns your cuts to the exact tempo of your soundtrack.</p>
+        <div class="divide-y divide-white/[0.07] border-t border-b border-white/[0.07]">
+          <details class="group py-4" open>
+            <summary class="flex items-center justify-between cursor-pointer list-none text-sm font-medium text-zinc-200">
+              <span>Are my videos or audio files ever uploaded to a server?</span>
+              <span class="font-mono text-zinc-500 group-open:rotate-45 transition-transform">+</span>
+            </summary>
+            <p class="text-xs text-zinc-400 leading-relaxed mt-2.5 pr-6">Never. All video decoding, motion analysis, beat detection, and MP4 encoding happen strictly inside your device's local browser memory. Your source files never leave your computer or phone, guaranteeing complete privacy and zero upload wait times.</p>
+          </details>
+          <details class="group py-4">
+            <summary class="flex items-center justify-between cursor-pointer list-none text-sm font-medium text-zinc-200">
+              <span>Which video and audio formats are supported?</span>
+              <span class="font-mono text-zinc-500 group-open:rotate-45 transition-transform">+</span>
+            </summary>
+            <p class="text-xs text-zinc-400 leading-relaxed mt-2.5 pr-6">CutPulse supports standard web-compatible containers including MP4 (H.264/H.265), MOV, and WebM for video, alongside MP3, WAV, OGG, and AAC for custom audio tracks. Final exports are rendered in crisp 720×1280 vertical MP4 format ready for YouTube Shorts, TikTok, and Instagram Reels.</p>
+          </details>
+          <details class="group py-4">
+            <summary class="flex items-center justify-between cursor-pointer list-none text-sm font-medium text-zinc-200">
+              <span>How do I get the cleanest beat-sync results?</span>
+              <span class="font-mono text-zinc-500 group-open:rotate-45 transition-transform">+</span>
+            </summary>
+            <p class="text-xs text-zinc-400 leading-relaxed mt-2.5 pr-6">For fast-paced gaming, automotive, or sports montages, upload a raw clip longer than 10 seconds with clear movement and pair it with a high-contrast bass track (125–150 BPM). For talking-head podcasts or commentary clips, switch to the Clean Cut (Auto-Silence) mode with 9:16 Auto-Center framing.</p>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-white/[0.07] bg-[#09090B] py-6 px-4 lg:px-6">
+    <div class="max-w-[1600px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
+      <p>© 2026 CutPulse Studio. All processing performed locally on your device.</p>
+      <nav class="flex items-center gap-6">
+        <a href="/privacy" class="hover:text-zinc-200 transition-colors">Privacy Policy</a>
+        <a href="/terms" class="hover:text-zinc-200 transition-colors">Terms of Use</a>
+        <a href="/contact" class="hover:text-zinc-200 transition-colors">Contact</a>
+      </nav>
+    </div>
+  </footer>
+
+  <!-- INTEGRATED AI & MEDIA ENGINE (Web Audio + MediaPipe + FFmpeg.wasm) -->
+  <script type="module">
+    import { FaceDetector, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+
+    // --- DOM ELEMENTS ---
+    const videoInput = document.getElementById('videoInput');
+    const videoDropzone = document.getElementById('videoDropzone');
+    const videoFileCard = document.getElementById('videoFileCard');
+    const videoFileName = document.getElementById('videoFileName');
+    const videoFileMeta = document.getElementById('videoFileMeta');
+    const removeVideoBtn = document.getElementById('removeVideoBtn');
+    const previewVideo = document.getElementById('previewVideo');
+    const trackingCanvas = document.getElementById('trackingCanvas');
+    const viewportPlaceholder = document.getElementById('viewportPlaceholder');
+    const liveTimer = document.getElementById('liveTimer');
+    const frameBadge = document.getElementById('frameBadge');
+    const monitorModeLabel = document.getElementById('monitorModeLabel');
+    const resolutionBadge = document.getElementById('resolutionBadge');
+
+    const tabPresetBtn = document.getElementById('tabPresetBtn');
+    const tabUploadBtn = document.getElementById('tabUploadBtn');
+    const presetBeatsPanel = document.getElementById('presetBeatsPanel');
+    const uploadAudioPanel = document.getElementById('uploadAudioPanel');
+    const audioInput = document.getElementById('audioInput');
+    const audioFileName = document.getElementById('audioFileName');
+
+    const generateBtn = document.getElementById('generateBtn');
+    const generateBtnText = document.getElementById('generateBtnText');
+    const progressWrapper = document.getElementById('progressWrapper');
+    const progressBar = document.getElementById('progressBar');
+    const statusText = document.getElementById('statusText');
+    const waveformBar = document.getElementById('waveformBar');
+    const beatTimelineLabel = document.getElementById('beatTimelineLabel');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    const telemetryCore = document.getElementById('telemetryCore');
+    const telemetryVision = document.getElementById('telemetryVision');
+    const telemetryBeats = document.getElementById('telemetryBeats');
+    const telemetryCrop = document.getElementById('telemetryCrop');
+    const telemetryStyle = document.getElementById('telemetryStyle');
+
+    // --- APP STATE ---
+    let sourceVideoFile = null;
+    let customAudioFile = null;
+    let audioMode = 'preset'; // 'preset' | 'upload'
+    let selectedPreset = 'phonk'; // 'phonk' | 'trap' | 'silence'
+    let selectedStyle = 'Beat Cut'; // 'Beat Cut' | 'Punch + Flash' | '9:16 Auto-Center'
+    let outputBlobUrl = null;
+
+    let ffmpegInstance = null;
+    let faceDetector = null;
+
+    // --- UI HELPERS ---
+    function setStatus(msg, progress = null) {
+      statusText.textContent = msg;
+      if (progress !== null) {
+        progressWrapper.classList.remove('hidden');
+        progressBar.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+      }
+    }
+
+    previewVideo.addEventListener('timeupdate', () => {
+      const t = previewVideo.currentTime || 0;
+      const mins = Math.floor(t / 60).toString().padStart(2, '0');
+      const secs = (t % 60).toFixed(1).padStart(4, '0');
+      liveTimer.textContent = `${mins}:${secs}`;
+    });
+
+    // --- 1. VIDEO SELECTION ---
+    videoInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      sourceVideoFile = file;
+
+      if (outputBlobUrl) {
+        URL.revokeObjectURL(outputBlobUrl);
+        outputBlobUrl = null;
+      }
+      downloadBtn.disabled = true;
+      downloadBtn.className = "px-3.5 py-1.5 rounded-md bg-white/5 border border-white/[0.07] text-zinc-500 text-xs font-semibold flex items-center gap-1.5 cursor-not-allowed transition-all";
+
+      const url = URL.createObjectURL(file);
+      previewVideo.muted = true;
+      previewVideo.controls = false;
+      previewVideo.src = url;
+      previewVideo.classList.remove('hidden');
+      viewportPlaceholder.classList.add('hidden');
+      frameBadge.textContent = 'RAW INPUT';
+      frameBadge.classList.remove('text-emerald-400');
+      frameBadge.classList.add('text-zinc-300');
+      previewVideo.play();
+
+      videoDropzone.classList.add('hidden');
+      videoFileCard.classList.remove('hidden');
+      videoFileName.textContent = file.name;
+
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      previewVideo.onloadedmetadata = () => {
+        const mins = Math.floor(previewVideo.duration / 60).toString().padStart(2, '0');
+        const secs = Math.floor(previewVideo.duration % 60).toString().padStart(2, '0');
+        videoFileMeta.textContent = `${mins}:${secs} • ${sizeMB} MB`;
+        setStatus('Media loaded • Ready to analyze', 0);
+        progressWrapper.classList.add('hidden');
+      };
+    });
+
+    removeVideoBtn.addEventListener('click', () => {
+      sourceVideoFile = null;
+      videoInput.value = '';
+      previewVideo.pause();
+      previewVideo.src = '';
+      previewVideo.classList.add('hidden');
+      trackingCanvas.classList.add('hidden');
+      viewportPlaceholder.classList.remove('hidden');
+      videoFileCard.classList.add('hidden');
+      videoDropzone.classList.remove('hidden');
+      progressWrapper.classList.add('hidden');
+      setStatus('Ready • Waiting for source media');
+    });
+
+    // --- 2. AUDIO TABS & PRESETS ---
+    tabPresetBtn.addEventListener('click', () => {
+      audioMode = 'preset';
+      tabPresetBtn.classList.add('bg-white/10', 'text-zinc-100');
+      tabPresetBtn.classList.remove('text-zinc-400');
+      tabUploadBtn.classList.remove('bg-white/10', 'text-zinc-100');
+      tabUploadBtn.classList.add('text-zinc-400');
+      presetBeatsPanel.classList.remove('hidden');
+      uploadAudioPanel.classList.add('hidden');
+    });
+
+    tabUploadBtn.addEventListener('click', () => {
+      audioMode = 'upload';
+      tabUploadBtn.classList.add('bg-white/10', 'text-zinc-100');
+      tabUploadBtn.classList.remove('text-zinc-400');
+      tabPresetBtn.classList.remove('bg-white/10', 'text-zinc-100');
+      tabPresetBtn.classList.add('text-zinc-400');
+      uploadAudioPanel.classList.remove('hidden');
+      presetBeatsPanel.classList.add('hidden');
+    });
+
+    audioInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      customAudioFile = file;
+      audioFileName.textContent = file.name;
+    });
+
+    document.querySelectorAll('.preset-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedPreset = btn.dataset.preset;
+        document.querySelectorAll('.preset-option').forEach(b => {
+          b.classList.remove('border-violet-500');
+          b.classList.add('border-white/[0.07]');
+        });
+        btn.classList.remove('border-white/[0.07]');
+        btn.classList.add('border-violet-500');
+      });
+    });
+
+    document.querySelectorAll('.style-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedStyle = btn.dataset.style;
+        document.querySelectorAll('.style-option').forEach(b => {
+          b.classList.remove('border-violet-500');
+          b.classList.add('border-white/[0.07]');
+        });
+        btn.classList.remove('border-white/[0.07]');
+        btn.classList.add('border-violet-500');
+        telemetryStyle.textContent = selectedStyle;
+      });
+    });
+
+    // --- 3. INITIALIZE MEDIAPIPE FACE DETECTOR ---
+    async function initMediaPipe() {
+      if (faceDetector) return faceDetector;
+      try {
+        telemetryVision.textContent = 'Loading Model...';
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+        );
+        faceDetector = await FaceDetector.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+            delegate: "GPU"
+          },
+          runningMode: "IMAGE"
+        });
+        telemetryVision.textContent = 'BlazeFace Active';
+        return faceDetector;
+      } catch (err) {
+        console.warn("MediaPipe fallback to motion-only mode:", err);
+        telemetryVision.textContent = 'Motion Fallback';
+        return null;
+      }
+    }
+
+    // --- 4. INITIALIZE FFMPEG.WASM ---
+    async function initFFmpeg() {
+      if (ffmpegInstance && ffmpegInstance.loaded) return ffmpegInstance;
+      telemetryCore.textContent = 'Loading WASM...';
+      const { FFmpeg } = window.FFmpegWASM;
+      const { toBlobURL } = window.FFmpegUtil;
+
+      const ffmpeg = new FFmpeg();
+      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      });
+      ffmpegInstance = ffmpeg;
+      telemetryCore.textContent = 'WASM Ready';
+      return ffmpeg;
+    }
+
+    // --- 5. WEB AUDIO: BEAT DETECTION & SYNTHESIS ---
+    function renderWaveformTimeline(timestamps, totalDuration) {
+      waveformBar.innerHTML = '';
+      const count = timestamps.length;
+      beatTimelineLabel.textContent = `${count} CUTS MAPPED`;
+      telemetryBeats.textContent = count;
+
+      timestamps.forEach((t, idx) => {
+        const pct = Math.min(98, Math.max(1, (t / totalDuration) * 100));
+        const bar = document.createElement('div');
+        bar.style.left = `${pct}%`;
+        bar.className = 'absolute top-1.5 bottom-1.5 w-[2px] bg-amber-400 rounded-full opacity-90';
+        waveformBar.appendChild(bar);
+      });
+    }
+
+    // Synthesize real Phonk/Trap beat track in browser memory (returns WAV Uint8Array + beat timestamps)
+    async function synthesizePresetBeat(bpm, durationSec = 12) {
+      const sampleRate = 44100;
+      const offlineCtx = new OfflineAudioContext(1, sampleRate * durationSec, sampleRate);
+      const beatInterval = 60 / bpm;
+      const beats = [];
+
+      for (let t = 0; t < durationSec - 0.3; t += beatInterval) {
+        beats.push(Number(t.toFixed(3)));
+
+        // Kick / 808 Bass Punch
+        const osc = offlineCtx.createOscillator();
+        const gain = offlineCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(145, t);
+        osc.frequency.exponentialRampToValueAtTime(38, t + 0.14);
+
+        gain.gain.setValueAtTime(0.95, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+
+        osc.connect(gain);
+        gain.connect(offlineCtx.destination);
+        osc.start(t);
+        osc.stop(t + 0.34);
+
+        // Hi-hat tick on half-beat
+        const hatTime = t + beatInterval / 2;
+        if (hatTime < durationSec) {
+          const hatOsc = offlineCtx.createOscillator();
+          const hatGain = offlineCtx.createGain();
+          hatOsc.type = 'square';
+          hatOsc.frequency.setValueAtTime(6500, hatTime);
+          hatGain.gain.setValueAtTime(0.08, hatTime);
+          hatGain.gain.exponentialRampToValueAtTime(0.001, hatTime + 0.04);
+          hatOsc.connect(hatGain);
+          hatGain.connect(offlineCtx.destination);
+          hatOsc.start(hatTime);
+          hatOsc.stop(hatTime + 0.05);
+        }
+      }
+
+      const renderedBuffer = await offlineCtx.startRendering();
+      const wavBytes = audioBufferToWav(renderedBuffer);
+      return { audioBytes: wavBytes, fileName: 'synth_beat.wav', beats, totalDuration: durationSec };
+    }
+
+    // Detect low-pass kick/bass transients from custom MP3/WAV
+    async function analyzeUploadedAudio(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+
+      // Isolate <140Hz bass frequencies via OfflineAudioContext LowPassFilter
+      const maxDur = Math.min(decoded.duration, 18); // Cap at 18s for fast browser export
+      const offlineCtx = new OfflineAudioContext(1, Math.floor(decoded.sampleRate * maxDur), decoded.sampleRate);
+      const source = offlineCtx.createBufferSource();
+      source.buffer = decoded;
+
+      const filter = offlineCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 140;
+
+      source.connect(filter);
+      filter.connect(offlineCtx.destination);
+      source.start(0);
+
+      const filteredBuffer = await offlineCtx.startRendering();
+      const data = filteredBuffer.getChannelData(0);
+      const sr = filteredBuffer.sampleRate;
+      const windowSize = Math.floor(sr * 0.05); // 50ms windows
+      const energies = [];
+
+      for (let i = 0; i < data.length; i += windowSize) {
+        let sum = 0;
+        for (let j = 0; j < windowSize && i + j < data.length; j++) {
+          sum += data[i + j] * data[i + j];
+        }
+        energies.push({ time: i / sr, energy: Math.sqrt(sum / windowSize) });
+      }
+
+      const avgEnergy = energies.reduce((acc, e) => acc + e.energy, 0) / (energies.length || 1);
+      const threshold = avgEnergy * 1.45;
+      const beats = [0];
+
+      for (let i = 1; i < energies.length - 1; i++) {
+        const curr = energies[i];
+        if (
+          curr.energy > threshold &&
+          curr.energy > energies[i - 1].energy &&
+          curr.energy >= energies[i + 1].energy &&
+          curr.time - beats[beats.length - 1] >= 0.42
+        ) {
+          beats.push(Number(curr.time.toFixed(3)));
+          if (beats.length >= 16) break;
+        }
+      }
+
+      if (beats.length < 4) {
+        // Fallback uniform grid if track is ambient/beatless
+        for (let t = 0.8; t < maxDur; t += 0.8) beats.push(Number(t.toFixed(3)));
+      }
+
+      const rawBytes = new Uint8Array(await file.arrayBuffer());
+      const ext = file.name.split('.').pop() || 'mp3';
+      return { audioBytes: rawBytes, fileName: `custom_audio.${ext}`, beats, totalDuration: maxDur };
+    }
+
+    // Voice Activity Detection (Auto-Silence Trim on Source Video)
+    async function detectSpeechSegments(videoFile) {
+      const arrayBuffer = await videoFile.arrayBuffer();
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      const data = decoded.getChannelData(0);
+      const sr = decoded.sampleRate;
+      const step = Math.floor(sr * 0.1); // 100ms chunks
+      const segments = [];
+      let inSpeech = false;
+      let segStart = 0;
+
+      for (let i = 0; i < data.length; i += step) {
+        let rms = 0;
+        for (let j = 0; j < step && i + j < data.length; j++) {
+          rms += data[i + j] * data[i + j];
+        }
+        rms = Math.sqrt(rms / step);
+        const time = i / sr;
+
+        if (rms > 0.025 && !inSpeech) {
+          inSpeech = true;
+          segStart = Math.max(0, time - 0.1);
+        } else if (rms <= 0.025 && inSpeech) {
+          inSpeech = false;
+          if (time - segStart >= 0.45) {
+            segments.push({ start: Number(segStart.toFixed(2)), duration: Number((time - segStart + 0.1).toFixed(2)) });
+          }
+        }
+        if (segments.length >= 14) break;
+      }
+
+      if (segments.length === 0) {
+        segments.push({ start: 0, duration: Math.min(decoded.duration, 10) });
+      }
+      return segments;
+    }
+
+    // Convert AudioBuffer to 16-bit PCM WAV
+    function audioBufferToWav(buffer) {
+      const numOfChan = buffer.numberOfChannels;
+      const length = buffer.length * numOfChan * 2 + 44;
+      const out = new ArrayBuffer(length);
+      const view = new DataView(out);
+      const sampleRate = buffer.sampleRate;
+      let pos = 0;
+
+      const setUint16 = (data) => { view.setUint16(pos, data, true); pos += 2; };
+      const setUint32 = (data) => { view.setUint32(pos, data, true); pos += 4; };
+
+      setUint32(0x46464952); // "RIFF"
+      setUint32(length - 8);
+      setUint32(0x45564157); // "WAVE"
+      setUint32(0x20746d66); // "fmt "
+      setUint32(16);
+      setUint16(1); // PCM
+      setUint16(numOfChan);
+      setUint32(sampleRate);
+      setUint32(sampleRate * 2 * numOfChan);
+      setUint16(numOfChan * 2);
+      setUint16(16);
+      setUint32(0x61746164); // "data"
+      setUint32(length - pos - 4);
+
+      const channel = buffer.getChannelData(0);
+      for (let i = 0; i < channel.length; i++) {
+        const sample = Math.max(-1, Math.min(1, channel[i]));
+        view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        pos += 2;
+      }
+      return new Uint8Array(out);
+    }
+
+    // --- 6. MEDIAPIPE + MOTION SCANNER ---
+    async function scanVideoWithAI(file, detector) {
+      return new Promise((resolve) => {
+        const tempVideo = document.createElement('video');
+        tempVideo.src = URL.createObjectURL(file);
+        tempVideo.muted = true;
+        tempVideo.playsInline = true;
+
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = 160;
+        offCanvas.height = 160;
+        const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
+
+        trackingCanvas.width = 260;
+        trackingCanvas.height = 462;
+        const overlayCtx = trackingCanvas.getContext('2d');
+        trackingCanvas.classList.remove('hidden');
+
+        tempVideo.onloadedmetadata = async () => {
+          const duration = tempVideo.duration || 5;
+          const sampleCount = Math.min(18, Math.max(6, Math.floor(duration * 1.5)));
+          const samples = [];
+          let prevPixels = null;
+          let faceCenterXSum = 0;
+          let faceHits = 0;
+
+          for (let i = 0; i < sampleCount; i++) {
+            const seekTime = Math.min(duration - 0.2, (i / sampleCount) * duration);
+            await new Promise((r) => {
+              tempVideo.onseeked = r;
+              tempVideo.currentTime = seekTime;
+            });
+
+            offCtx.drawImage(tempVideo, 0, 0, 160, 160);
+            const frameData = offCtx.getImageData(0, 0, 160, 160).data;
+
+            // Compute pixel motion energy
+            let motionScore = 0;
+            if (prevPixels) {
+              for (let p = 0; p < frameData.length; p += 16) {
+                motionScore += Math.abs(frameData[p] - prevPixels[p]);
+              }
+            }
+            prevPixels = new Uint8ClampedArray(frameData);
+
+            // MediaPipe Face Detection
+            overlayCtx.clearRect(0, 0, trackingCanvas.width, trackingCanvas.height);
+            let hasFace = false;
+            if (detector) {
+              try {
+                const detections = detector.detect(offCanvas).detections;
+                if (detections && detections.length > 0) {
+                  const box = detections[0].boundingBox;
+                  const normCenterX = (box.originX + box.width / 2) / 160;
+                  faceCenterXSum += normCenterX;
+                  faceHits++;
+                  hasFace = true;
+
+                  // Draw live HUD tracking reticle on preview
+                  const rx = (box.originX / 160) * trackingCanvas.width;
+                  const ry = (box.originY / 160) * trackingCanvas.height;
+                  const rw = (box.width / 160) * trackingCanvas.width;
+                  const rh = (box.height / 160) * trackingCanvas.height;
+                  overlayCtx.strokeStyle = '#F59E0B';
+                  overlayCtx.lineWidth = 2;
+                  overlayCtx.strokeRect(rx, ry, rw, rh);
+                  overlayCtx.fillStyle = '#F59E0B';
+                  overlayCtx.font = '10px JetBrains Mono';
+                  overlayCtx.fillText('AI SUBJECT LOCK', rx, Math.max(12, ry - 4));
+                }
+              } catch (_) {}
+            }
+
+            samples.push({
+              time: seekTime,
+              score: motionScore + (hasFace ? 50000 : 0)
+            });
+
+            setStatus(`AI Scanning Frame ${i + 1}/${sampleCount}...`, 20 + (i / sampleCount) * 25);
+          }
+
+          trackingCanvas.classList.add('hidden');
+          URL.revokeObjectURL(tempVideo.src);
+
+          const avgCenterX = faceHits > 0 ? faceCenterXSum / faceHits : 0.5;
+          telemetryCrop.textContent = faceHits > 0 ? `Face (${Math.round(avgCenterX * 100)}%)` : 'Center (50%)';
+
+          // Sort timestamps by highest action/face priority
+          samples.sort((a, b) => b.score - a.score);
+          resolve({
+            videoWidth: tempVideo.videoWidth || 1920,
+            videoHeight: tempVideo.videoHeight || 1080,
+            duration,
+            avgCenterX,
+            rankedTimestamps: samples.map(s => s.time)
+          });
+        };
+      });
+    }
+
+    // --- 7. MAIN AUTO-EDIT PIPELINE ---
+    generateBtn.addEventListener('click', async () => {
+      if (!sourceVideoFile) {
+        setStatus('Error: Please load a source video first.');
+        return;
+      }
+      if (audioMode === 'upload' && !customAudioFile) {
+        setStatus('Error: Please upload an MP3/WAV file or switch to Preset Beats.');
+        return;
+      }
+
+      generateBtn.disabled = true;
+      generateBtnText.textContent = 'Processing in Browser...';
+
+      try {
+        // Step A: Load AI & WASM Engines
+        setStatus('Initializing MediaPipe & FFmpeg WASM...', 10);
+        const [detector, ffmpeg] = await Promise.all([initMediaPipe(), initFFmpeg()]);
+
+        // Step B: Scan Video with MediaPipe & Motion Analyzer
+        const visionData = await scanVideoWithAI(sourceVideoFile, detector);
+
+        // Calculate 9:16 Smart Crop Geometry
+        const targetAspect = 9 / 16;
+        let cropW = Math.floor(visionData.videoHeight * targetAspect);
+        let cropH = visionData.videoHeight;
+        if (cropW > visionData.videoWidth) {
+          cropW = visionData.videoWidth;
+          cropH = Math.floor(visionData.videoWidth / targetAspect);
+        }
+        // Ensure even dimensions for H.264
+        cropW -= cropW % 2;
+        cropH -= cropH % 2;
+        const maxCropX = Math.max(0, visionData.videoWidth - cropW);
+        const cropX = Math.min(maxCropX, Math.max(0, Math.floor(visionData.avgCenterX * visionData.videoWidth - cropW / 2)));
+
+        // Step C: Write source video into FFmpeg virtual filesystem
+        setStatus('Loading video into WASM memory...', 50);
+        const { fetchFile } = window.FFmpegUtil;
+        await ffmpeg.writeFile('input.mp4', await fetchFile(sourceVideoFile));
+
+        let filterComplex = '';
+        let ffmpegArgs = [];
+
+        if (audioMode === 'preset' && selectedPreset === 'silence') {
+          // --- MODE 1: AUTO-SILENCE TRIM (TALKING HEAD) ---
+          setStatus('Detecting vocal transients (VAD)...', 60);
+          const segments = await detectSpeechSegments(sourceVideoFile);
+          renderWaveformTimeline(segments.map(s => s.start), visionData.duration);
+
+          let concatInputs = '';
+          segments.forEach((seg, i) => {
+            filterComplex += `[0:v]trim=start=${seg.start}:duration=${seg.duration},setpts=PTS-STARTPTS,crop=${cropW}:${cropH}:${cropX}:0,scale=720:1280[v${i}];`;
+            filterComplex += `[0:a]atrim=start=${seg.start}:duration=${seg.duration},asetpts=PTS-STARTPTS[a${i}];`;
+            concatInputs += `[v${i}][a${i}]`;
+          });
+          filterComplex += `${concatInputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
+
+          ffmpegArgs = [
+            '-i', 'input.mp4',
+            '-filter_complex', filterComplex,
+            '-map', '[outv]',
+            '-map', '[outa]',
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-crf', '24',
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac',
+            'output.mp4'
+          ];
+        } else {
+          // --- MODE 2: BEAT-SYNC MONTAGE (PRESET OR CUSTOM MP3) ---
+          setStatus('Extracting audio beat timestamps...', 60);
+          let beatPackage;
+          if (audioMode === 'upload') {
+            beatPackage = await analyzeUploadedAudio(customAudioFile);
+          } else {
+            const bpm = selectedPreset === 'trap' ? 145 : 130;
+            beatPackage = await synthesizePresetBeat(bpm, 11);
+          }
+
+          await ffmpeg.writeFile(beatPackage.fileName, beatPackage.audioBytes);
+          const beats = beatPackage.beats;
+          renderWaveformTimeline(beats, beatPackage.totalDuration);
+
+          const cutCount = Math.max(2, beats.length - 1);
+          let concatVideoInputs = '';
+
+          for (let i = 0; i < cutCount; i++) {
+            const segDur = Math.max(0.25, Number((beats[i + 1] - beats[i]).toFixed(3)));
+            const rankedTime = visionData.rankedTimestamps[i % visionData.rankedTimestamps.length] || 0;
+            const safeStart = Math.min(Math.max(0, visionData.duration - segDur - 0.1), rankedTime);
+
+            let effectsChain = `crop=${cropW}:${cropH}:${cropX}:0,scale=720:1280`;
+
+            if (selectedStyle === 'Punch + Flash') {
+              // Alternating subtle zoom punch + flash transient on cut
+              const isZoom = i % 2 === 1;
+              if (isZoom) {
+                effectsChain += `,scale=806:1434,crop=720:1280:43:77`;
+              }
+              effectsChain += `,eq=brightness=0.16:enable='lt(t,0.08)'`;
+            }
+
+            filterComplex += `[0:v]trim=start=${safeStart.toFixed(2)}:duration=${segDur},setpts=PTS-STARTPTS,${effectsChain}[v${i}];`;
+            concatVideoInputs += `[v${i}]`;
+          }
+
+          filterComplex += `${concatVideoInputs}concat=n=${cutCount}:v=1:a=0[outv]`;
+
+          ffmpegArgs = [
+            '-i', 'input.mp4',
+            '-i', beatPackage.fileName,
+            '-filter_complex', filterComplex,
+            '-map', '[outv]',
+            '-map', '1:a',
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-crf', '24',
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-shortest',
+            'output.mp4'
+          ];
+        }
+
+        // Step D: Render Final MP4
+        setStatus('Rendering beat-synced MP4 locally...', 78);
+        telemetryCore.textContent = 'Rendering...';
+        await ffmpeg.exec(ffmpegArgs);
+
+        setStatus('Finalizing export buffer...', 95);
+        const outputData = await ffmpeg.readFile('output.mp4');
+        const videoBlob = new Blob([outputData.buffer], { type: 'video/mp4' });
+        outputBlobUrl = URL.createObjectURL(videoBlob);
+
+        // Load Edited Result Directly Into Live Monitor
+        previewVideo.src = outputBlobUrl;
+        previewVideo.muted = false;
+        previewVideo.controls = true;
+        frameBadge.textContent = 'EDITED OUTPUT';
+        frameBadge.classList.remove('text-zinc-300');
+        frameBadge.classList.add('text-emerald-400');
+        previewVideo.play();
+
+        // Activate Download Button
+        downloadBtn.disabled = false;
+        downloadBtn.className = "px-3.5 py-1.5 rounded-md accent-gradient text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all accent-glow";
+
+        telemetryCore.textContent = 'Complete';
+        setStatus('Done • Beat-synced edit ready for download', 100);
+      } catch (err) {
+        console.error(err);
+        telemetryCore.textContent = 'Error';
+        setStatus(`Render Error: ${err.message || 'Check console details'}`);
+      } finally {
+        generateBtn.disabled = false;
+        generateBtnText.textContent = 'Generate Auto-Edit';
+      }
+    });
+
+    // --- 8. LOCAL MP4 DOWNLOAD ---
+    downloadBtn.addEventListener('click', () => {
+      if (!outputBlobUrl) return;
+      const a = document.createElement('a');
+      a.href = outputBlobUrl;
+      a.download = `cutpulse-edit-${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+
+    // --- 9. COLLAPSIBLE AD BANNER ---
+    const adBannerToggle = document.getElementById('adBannerToggle');
+    const adSlot = document.getElementById('adSlot');
+    if (adBannerToggle && adSlot) {
+      adBannerToggle.addEventListener('click', () => {
+        if (adSlot.classList.contains('hidden')) {
+          adSlot.classList.remove('hidden');
+          adBannerToggle.textContent = 'Hide';
+        } else {
+          adSlot.classList.add('hidden');
+          adBannerToggle.textContent = 'Show';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

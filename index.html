@@ -76,13 +76,14 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
       padding: 0 12px;
       background: var(--surface);
       border-bottom: var(--border);
       position: relative;
       z-index: 60;
     }
-    .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .brand { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 0 0 auto; }
     .logo-mark {
       width: 27px; height: 27px; border-radius: 8px;
       background: linear-gradient(140deg, #7C3AED 0%, #5B21B6 100%);
@@ -91,14 +92,15 @@
       flex: 0 0 auto;
     }
     .logo-mark svg { width: 15px; height: 15px; color: #fff; }
-    .brand-name { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+    .brand-name { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--text); white-space: nowrap; }
 
-    .topbar-right { display: flex; align-items: center; gap: 8px; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 
     .beats-pill {
       height: 28px;
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 0 12px;
+      flex: 0 0 auto;
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 0 11px;
       border-radius: 999px;
       background: var(--pill);
       border: var(--border);
@@ -112,6 +114,7 @@
     .beats-pill strong { color: var(--violet-text); font-weight: 700; }
 
     .export-btn {
+      flex: 0 0 auto;
       min-height: 36px;
       height: 36px;
       display: inline-flex; align-items: center; gap: 6px;
@@ -216,6 +219,7 @@
     /* Stage overlay badges */
     .stage-badge {
       position: absolute; top: 10px; z-index: 25;
+      max-width: calc(50% - 16px);
       font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
       color: var(--text);
       background: rgba(9, 9, 11, 0.62);
@@ -223,10 +227,11 @@
       padding: 4px 8px; border-radius: 6px;
       backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
       pointer-events: none;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .badge-left  { left: 10px; color: var(--dim); }
     .badge-left.edited { color: #34D399; border-color: rgba(52, 211, 153, 0.35); }
-    .badge-right { right: 10px; }
+    .badge-right { right: 10px; max-width: none; color: #E4E4E7; }
 
     /* Circular play/pause overlay */
     .play-overlay {
@@ -257,14 +262,14 @@
 
     /* Status chip — floats at bottom of the stage */
     .status-chip {
-      position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
-      z-index: 26; max-width: 92%;
-      font-family: var(--mono); font-size: 10px; font-weight: 500;
+      position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+      z-index: 26; max-width: calc(100% - 20px);
+      font-family: var(--mono); font-size: 9.5px; font-weight: 500; line-height: 1.35;
       color: #D4D4D8;
       background: rgba(9, 9, 11, 0.78);
       border: var(--border);
       border-radius: 999px;
-      padding: 4px 12px;
+      padding: 4px 11px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
       pointer-events: none;
@@ -514,8 +519,8 @@
       transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
     }
     .style-option svg { width: 21px; height: 21px; color: var(--dim); transition: color .18s ease; }
-    .style-option .style-title { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
-    .style-option .style-sub { font-size: 10px; color: var(--dim); white-space: nowrap; }
+    .style-option .style-title { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .style-option .style-sub { font-size: 10px; color: var(--dim); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
     .style-option:hover { border-color: rgba(255, 255, 255, 0.18); }
     .style-option.active {
       border-color: var(--accent-line);
@@ -651,7 +656,7 @@
       </div>
 
       <div class="topbar-right">
-        <span class="beats-pill" title="Detected beats">Beats&nbsp;·&nbsp;<strong id="telemetryBeats">0</strong></span>
+        <span class="beats-pill" title="Detected beat drops"><strong id="telemetryBeats">0</strong>&nbsp;Beats</span>
         <button id="downloadBtn" class="export-btn" type="button" disabled>
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -691,7 +696,7 @@
             </div>
 
             <!-- Top badges -->
-            <span class="stage-badge badge-left" id="frameBadge">RAW INPUT</span>
+            <span class="stage-badge badge-left" id="frameBadge">RAW</span>
             <span class="stage-badge badge-right" id="liveTimer">00:00.0</span>
 
             <!-- Circular play/pause -->
@@ -703,15 +708,15 @@
             </div>
 
             <!-- Floating status chip -->
-            <div class="status-chip" id="statusText">Ready · Phonk Drift 130 BPM active</div>
+            <div class="status-chip" id="statusText">Ready · Phonk Drift 130 BPM</div>
           </div>
         </div>
 
         <!-- ══════════ COMPACT BEAT TIMELINE BAR (40px) ══════════ -->
-        <div class="timeline-bar" aria-label="Audio transients beat timeline">
+        <div class="timeline-bar" aria-label="Audio bass drop timeline">
           <div class="timeline-labels">
-            <span>AUDIO TRANSIENTS</span>
-            <span class="cut-count" id="beatTimelineLabel">0 CUTS</span>
+            <span>BASS DROPS</span>
+            <span class="cut-count" id="beatTimelineLabel">0 DROPS</span>
           </div>
           <div class="track" id="waveformTrack">
             <div class="track-fill" id="waveformFill"></div>
@@ -781,7 +786,7 @@
                   <svg fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18V6l10-2v11.5M9 18a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm10-1.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>
                   <span class="preset-name">Phonk Drift</span>
                 </span>
-                <span class="preset-mid"><span class="preset-desc">Synthesized 808 bass · fast hard cuts</span></span>
+                <span class="preset-mid"><span class="preset-desc">Synthesized 808 bass · 8–16 heavy drops</span></span>
                 <span class="bpm-badge">130 BPM</span>
               </button>
 
@@ -821,19 +826,19 @@
               <button type="button" data-style="Beat Cut" class="style-option active">
                 <svg fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h6M4 12h10M4 17h6M14 4l7 8-7 8"/></svg>
                 <span class="style-title">Beat Cut</span>
-                <span class="style-sub">Hard cuts on kicks</span>
+                <span class="style-sub">Zoom · shake · speed</span>
               </button>
 
               <button type="button" data-style="Punch + Flash" class="style-option">
                 <svg fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 3L4.5 13.5H11L10 21l8.5-10.5H12L13 3z"/></svg>
                 <span class="style-title">Punch + Flash</span>
-                <span class="style-sub">1.16× zoom &amp; flash</span>
+                <span class="style-sub">1.22× punch + flash</span>
               </button>
 
               <button type="button" data-style="9:16 Center" class="style-option">
                 <svg fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="1.6"/><path stroke-linecap="round" d="M12 7.5h.01M10.5 12h3m-3 3h3"/></svg>
                 <span class="style-title">9:16 Center</span>
-                <span class="style-sub">Center framing</span>
+                <span class="style-sub">Center + soft FX</span>
               </button>
             </div>
           </section>
@@ -937,8 +942,15 @@
     let currentTimeline = 0;
     let rafId = null;
     let nextBeatIndex = 0;
-    let punchScale = 1;
-    let flashAlpha = 0;
+
+    // Beat-FX engine state — every effect is time-based so it renders
+    // identically in the live preview and in the 30fps export.
+    let beatFxAt = -10;
+    let beatFxStrength = 1;
+    let currentPlaybackRate = 1;
+    let velocityDropUntil = 0;
+    let lastSceneJumpAt = -10;
+    let vignetteGrad = null;
 
     let audioSourceNode = null;
     let gainNode = null;
@@ -966,20 +978,32 @@
     }
 
     // ============================================================
-    // PRESET BEATS — synthesized 808 / trap profiles
+    // IMPACT BEATS — 8-16 real drops, not 50 micro-transients
     // ============================================================
-    function initPresetBeats(bpm, durationSec) {
-      const beatInterval = 60 / bpm;
-      beats = [];
+    function thinBeats(list, maxCount) {
+      const unique = [...new Set(list)].sort((a, b) => a - b);
+      if (unique.length <= maxCount) return unique;
+      const out = [];
+      for (let i = 0; i < maxCount; i++) {
+        out.push(unique[Math.round((i * (unique.length - 1)) / (maxCount - 1))]);
+      }
+      return [...new Set(out)];
+    }
 
-      for (let t = 0; t < durationSec - 0.1; t += beatInterval) {
-        beats.push(Number(t.toFixed(3)));
+    function buildImpactBeats(bpm, durationSec) {
+      const beatInterval = 60 / bpm;
+      const impacts = [];
+
+      // Only every second kick becomes a visible drop. The off-beats and
+      // hi-hats remain in the audio, but they no longer spam the timeline.
+      for (let t = 0; t < durationSec - 0.05; t += beatInterval * 2) {
+        impacts.push(Number(t.toFixed(3)));
       }
-      const halfInterval = beatInterval / 2;
-      for (let t = halfInterval; t < durationSec - 0.1; t += beatInterval) {
-        beats.push(Number(t.toFixed(3)));
-      }
-      beats = [...new Set(beats)].sort((a, b) => a - b);
+      return thinBeats(impacts, 16);
+    }
+
+    function initPresetBeats(bpm, durationSec) {
+      beats = buildImpactBeats(bpm, durationSec);
     }
 
     // (Re)build preset beat map for the active BPM profile over a window.
@@ -1000,11 +1024,8 @@
       const sampleRate = 44100;
       const offline = new OfflineAudioContext(2, Math.floor(sampleRate * durationSec), sampleRate);
       const beatInterval = 60 / bpm;
-      const beatsArr = [];
 
       for (let t = 0; t < durationSec - 0.1; t += beatInterval) {
-        beatsArr.push(Number(t.toFixed(3)));
-
         // Deep 808 kick
         const kick = offline.createOscillator();
         const kg = offline.createGain();
@@ -1048,7 +1069,7 @@
       }
 
       const rendered = await offline.startRendering();
-      return { audioBuffer: rendered, beats: beatsArr, duration: durationSec };
+      return { audioBuffer: rendered, beats: buildImpactBeats(bpm, durationSec), duration: durationSec };
     }
 
     // ============================================================
@@ -1062,44 +1083,87 @@
       const maxDur = Math.min(decoded.duration, 30);
       const data = decoded.getChannelData(0);
       const sr = decoded.sampleRate;
+      const totalSamples = Math.min(data.length, Math.floor(sr * maxDur));
+
+      // One-pole low-pass around 160 Hz: lock onto kicks / 808 bass and ignore
+      // hi-hats, snares and vocals that used to create a cut every 220 ms.
+      const alpha = 1 - Math.exp((-2 * Math.PI * 160) / sr);
+      const step = Math.max(1, Math.floor(sr * 0.02)); // 20 ms analysis frames
       const energies = [];
 
-      const totalSamples = Math.floor(sr * maxDur);
-      for (let i = 0; i < totalSamples; i += Math.floor(sr * 0.02)) {
-        let sum = 0, n = 0;
-        const end = Math.min(i + Math.floor(sr * 0.02), totalSamples);
-        for (let j = i; j < end; j++) { sum += data[j] * data[j]; n++; }
-        energies.push({ time: i / sr, energy: Math.sqrt(sum / (n || 1)) });
-      }
-
-      // Transient peaks: > 1.35x local RMS, min 220ms spacing, from 0.3s
-      const maWindow = 20;
-      const beatsArr = [0];
-      let lastBeatTime = -1;
-
-      for (let i = 1; i < energies.length - 1; i++) {
-        let s = 0, c = 0;
-        for (let k = Math.max(0, i - maWindow); k <= Math.min(energies.length - 1, i + maWindow); k++) {
-          s += energies[k].energy; c++;
-        }
-        const ma = s / (c || 1);
-        const curr = energies[i];
-        if (
-          curr.energy > ma * 1.35 &&
-          curr.energy > energies[i - 1].energy &&
-          curr.energy >= energies[i + 1].energy &&
-          (lastBeatTime < 0 || curr.time - lastBeatTime >= 0.22) &&
-          curr.time > 0.3
-        ) {
-          beatsArr.push(Number(curr.time.toFixed(3)));
-          lastBeatTime = curr.time;
-          if (beatsArr.length >= 50) break;
+      let lp = 0, sum = 0, n = 0;
+      for (let i = 0; i < totalSamples; i++) {
+        lp += alpha * (data[i] - lp);
+        sum += lp * lp;
+        n++;
+        if (n >= step) {
+          energies.push({ time: i / sr, energy: Math.sqrt(sum / n) });
+          sum = 0;
+          n = 0;
         }
       }
 
-      if (beatsArr.length < 4) {
-        for (let t = 0.5; t < maxDur; t += 0.5) beatsArr.push(Number(t.toFixed(3)));
+      const maxBeats = Math.max(8, Math.min(24, Math.round(maxDur / 0.95)));
+      const minGap = 0.65; // hard minimum between two impactful drops
+
+      const detect = (threshold) => {
+        const found = [];
+        let last = 0; // the opening hit at 0s already owns the first 650 ms
+
+        for (let i = 3; i < energies.length - 1; i++) {
+          // Compare against the PRECEDING 600 ms only, so a big hit cannot
+          // inflate its own baseline and hide the next drop.
+          const start = Math.max(0, i - 30);
+          let s = 0, c = 0;
+          for (let k = start; k < i; k++) { s += energies[k].energy; c++; }
+          const localAvg = s / (c || 1);
+          const curr = energies[i];
+
+          if (
+            curr.energy > localAvg * threshold &&
+            curr.energy > energies[i - 1].energy &&
+            curr.energy >= energies[i + 1].energy &&
+            curr.time > 0.25 &&
+            curr.time - last >= minGap
+          ) {
+            found.push(curr);
+            last = curr.time;
+          }
+        }
+        return found;
+      };
+
+      let candidates = detect(1.6);
+      if (candidates.length < 6) candidates = detect(1.4);
+      if (candidates.length < 4) candidates = detect(1.25);
+
+      let beatsArr = candidates
+        .slice()
+        .sort((a, b) => a.time - b.time)
+        .map((b) => Number(b.time.toFixed(3)));
+
+      // Long track with too many hits: keep the hardest drops, then restore order.
+      if (beatsArr.length > maxBeats - 1) {
+        beatsArr = candidates
+          .slice()
+          .sort((a, b) => b.energy - a.energy)
+          .slice(0, maxBeats - 1)
+          .sort((a, b) => a.time - b.time)
+          .map((b) => Number(b.time.toFixed(3)));
       }
+
+      // Very quiet / ambient track fallback: spread clean impacts across the window.
+      if (beatsArr.length < 8) {
+        const target = Math.min(8, maxBeats);
+        const gap = maxDur / target;
+        for (let t = 0; t < maxDur && beatsArr.length < target; t += gap) {
+          const tt = Number(t.toFixed(3));
+          if (beatsArr.every((b) => Math.abs(b - tt) > 0.35)) beatsArr.push(tt);
+        }
+        beatsArr.sort((a, b) => a - b);
+      }
+
+      if (beatsArr[0] !== 0) beatsArr.unshift(0);
 
       return { audioBuffer: decoded, beats: beatsArr, duration: maxDur };
     }
@@ -1123,8 +1187,8 @@
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
       const samples = [];
-      const step = 0.5;
-      const count = Math.min(24, Math.max(4, Math.floor(duration / step)));
+      const step = 0.8;
+      const count = Math.min(10, Math.max(4, Math.floor(duration / step)));
       let prev = null;
 
       for (let i = 0; i < count; i++) {
@@ -1172,7 +1236,7 @@
     }
 
     // ============================================================
-    // CROP / CANVAS — 720x1280 (9:16) beat-jump rendering
+    // CROP / CANVAS — 720x1280 (9:16) smooth beat-FX rendering
     // ============================================================
     function computeCrop7201280(meta, avgSX) {
       const targetAspect = 720 / 1280; // 9/16
@@ -1190,13 +1254,43 @@
       return { cropW, cropH, maxCropX, baseX, sy };
     }
 
-    function drawCanvas916() {
+    // Time-based FX curve. The exact same curve is used by the preview and
+    // by the MediaRecorder export, so the beat hits never look different.
+    function getBeatFx(now) {
+      const age = now - beatFxAt;
+      const strength = beatFxStrength;
+      let zoom = 1, shakeX = 0, shakeY = 0, flash = 0, vignette = 0;
+
+      if (age >= 0 && age < 0.45) {
+        // 1.22x punch easing back to 1.0 over 300 ms
+        if (age < 0.30) {
+          const p = age / 0.30;
+          const decay = (1 - p) * (1 - p);
+          zoom = 1 + 0.22 * decay * strength;
+          flash = 0.20 * decay * strength;
+        }
+        // ±14px damped camera shake for 180 ms
+        if (age < 0.18) {
+          const p = age / 0.18;
+          const amp = 14 * (1 - p) * (1 - p) * strength;
+          shakeX = Math.sin(age * 132) * amp;
+          shakeY = Math.cos(age * 107) * amp * 0.8;
+        }
+        // Short vignette bloom on the drop
+        vignette = 0.30 * (1 - age / 0.45) * strength;
+      }
+
+      return { zoom, shakeX, shakeY, flash, vignette };
+    }
+
+    function drawCanvas916(now) {
       if (!sourceVideo.videoWidth) return;
 
       const meta = videoMeta;
       const crop = cropData || computeCrop7201280(meta, avgSubjectX);
 
-      let sx, sy = crop.sy;
+      let sx;
+      const sy = crop.sy;
       const cw = crop.cropW, ch = crop.cropH;
 
       if (selectedStyle === '9:16 Center') {
@@ -1208,43 +1302,87 @@
         sx = crop.baseX;
       }
 
-      const scale = selectedStyle === 'Punch + Flash' ? punchScale : 1;
-      const destW = 720 * scale;
-      const destH = 1280 * scale;
-      const destX = (720 - destW) / 2;
-      const destY = (1280 - destH) / 2;
+      const fx = getBeatFx(now);
 
-      pctx.clearRect(0, 0, 720, 1280);
-      pctx.drawImage(sourceVideo, sx, sy, cw, ch, destX, destY, destW, destH);
+      pctx.fillStyle = '#000';
+      pctx.fillRect(0, 0, 720, 1280);
 
-      if (selectedStyle === 'Punch + Flash' && flashAlpha > 0.01) {
-        pctx.fillStyle = `rgba(255,255,255,${flashAlpha * 0.4})`;
+      pctx.save();
+      pctx.translate(360 + fx.shakeX, 640 + fx.shakeY);
+      pctx.scale(fx.zoom, fx.zoom);
+      pctx.translate(-360, -640);
+      pctx.drawImage(sourceVideo, sx, sy, cw, ch, 0, 0, 720, 1280);
+      pctx.restore();
+
+      if (fx.flash > 0.004) {
+        pctx.fillStyle = `rgba(255,255,255,${fx.flash})`;
         pctx.fillRect(0, 0, 720, 1280);
+      }
+
+      if (fx.vignette > 0.004) {
+        if (!vignetteGrad) {
+          vignetteGrad = pctx.createRadialGradient(360, 560, 210, 360, 640, 760);
+          vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)');
+          vignetteGrad.addColorStop(0.62, 'rgba(0,0,0,0)');
+          vignetteGrad.addColorStop(1, 'rgba(0,0,0,0.92)');
+        }
+        pctx.save();
+        pctx.globalAlpha = fx.vignette;
+        pctx.fillStyle = vignetteGrad;
+        pctx.fillRect(0, 0, 720, 1280);
+        pctx.restore();
       }
     }
 
-    // Beat hit — punch/flash + hard beat-jump cut to a fresh source region
-    function onBeat() {
-      if (selectedStyle === 'Punch + Flash') {
-        punchScale = 1.16;
-        flashAlpha = 1;
-      } else if (selectedStyle === 'Beat Cut') {
-        punchScale = 1.08;
-        flashAlpha = 0;
-      } else {
-        punchScale = 1;
-        flashAlpha = 0;
-      }
+    function setVideoPlaybackRate(rate) {
+      if (Math.abs(currentPlaybackRate - rate) < 0.001) return;
+      currentPlaybackRate = rate;
+      try { sourceVideo.playbackRate = rate; } catch (_) { /* older mobile browsers */ }
+    }
 
-      // Beat-jump: hard cut to a different random section of the source
-      const dur = sourceVideo.duration || 0;
-      if (dur > 1) {
-        let nt = Math.random() * Math.max(0.1, dur - 0.5);
-        if (Math.abs(nt - sourceVideo.currentTime) < 0.8) {
-          nt = (nt + dur * 0.5) % Math.max(0.1, dur - 0.5);
-        }
-        try { sourceVideo.currentTime = nt; } catch (_) { /* seek races are non-fatal */ }
+    // NO random seeking here. The video flows forward and all the impact
+    // lives on the canvas: zoom, shake, flash, vignette + velocity ramp.
+    function onBeat() {
+      const now = getAudioCtx().currentTime;
+      beatFxAt = now;
+      beatFxStrength = selectedStyle === 'Punch + Flash' ? 1
+                     : selectedStyle === 'Beat Cut' ? 0.9
+                     : 0.68;
+
+      // Velocity: drop into slow-mo on the hit for 200 ms.
+      velocityDropUntil = now + 0.20;
+      setVideoPlaybackRate(0.75);
+
+      // Multi-clip sessions get one clean scene jump on a beat, never more
+      // often than every 2.5s. Single-clip playback never seeks at all.
+      maybeSceneJump(now);
+    }
+
+    function updateVideoVelocity(now, timeline) {
+      let target = 1;
+      const nextBeat = beats[nextBeatIndex];
+      const untilNext = nextBeat === undefined ? Infinity : nextBeat - timeline;
+
+      if (untilNext > 0 && untilNext <= 0.20) {
+        target = 1.75;          // 200 ms speed-up leading into the drop
+      } else if (now < velocityDropUntil) {
+        target = 0.75;          // slow-mo right after the bass hit
       }
+      setVideoPlaybackRate(target);
+    }
+
+    // A clean scene jump at most once every 2.5s, and only when the user
+    // actually added multiple clips. Single-clip sessions never seek.
+    function maybeSceneJump(now) {
+      if (videoFiles.length < 2) return;
+      const dur = sourceVideo.duration || 0;
+      if (dur < 4) return;
+      if (now - lastSceneJumpAt < 2.5) return;
+
+      lastSceneJumpAt = now;
+      let nt = sourceVideo.currentTime + 2.5;
+      if (nt > dur - 0.8) nt = 0.15;
+      try { sourceVideo.currentTime = nt; } catch (_) { /* seek races are non-fatal */ }
     }
 
     // ============================================================
@@ -1278,12 +1416,21 @@
       playStartCtxTime = ctx.currentTime;
       currentTimeline = fromTime;
       isPlaying = true;
-      nextBeatIndex = beats.findIndex(b => b > fromTime);
+      nextBeatIndex = beats.findIndex(b => b >= fromTime - 0.001);
       if (nextBeatIndex === -1) nextBeatIndex = beats.length;
-      punchScale = 1;
-      flashAlpha = 0;
 
+      beatFxAt = -10;
+      beatFxStrength = 1;
+      velocityDropUntil = 0;
+      currentPlaybackRate = 1;
+      lastSceneJumpAt = ctx.currentTime;
+      try { sourceVideo.playbackRate = 1; } catch (_) {}
+
+      sourceVideo.loop = true;
       sourceVideo.muted = timelineMode !== 'vad';
+      if (sourceVideo.ended) {
+        try { sourceVideo.currentTime = 0; } catch (_) {}
+      }
 
       if (timelineMode === 'music' && currentAudioBuffer) {
         const src = ctx.createBufferSource();
@@ -1306,6 +1453,7 @@
       isPlaying = false;
       if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
       stopAudioSource();
+      setVideoPlaybackRate(1);
       try { sourceVideo.pause(); } catch (_) {}
       updatePlayPauseButton();
       appShell.classList.remove('is-playing');
@@ -1320,22 +1468,19 @@
     function renderLoop() {
       if (!isPlaying) return;
       const ctx = getAudioCtx();
-      const t = playStartTimeline + (ctx.currentTime - playStartCtxTime);
+      const now = ctx.currentTime;
+      const t = playStartTimeline + (now - playStartCtxTime);
       currentTimeline = t;
 
-      // Fire every beat whose time has arrived
+      // Fire every impact whose time has arrived
       while (nextBeatIndex < beats.length && beats[nextBeatIndex] <= t) {
         onBeat();
         nextBeatIndex++;
       }
 
-      // Decay punch / flash fx
-      punchScale += (1 - punchScale) * 0.16;
-      if (Math.abs(punchScale - 1) < 0.004) punchScale = 1;
-      flashAlpha *= 0.78;
-      if (flashAlpha < 0.02) flashAlpha = 0;
+      updateVideoVelocity(now, t);
+      drawCanvas916(now);
 
-      drawCanvas916();
       liveTimer.textContent = formatTimecode(t);
       updatePlayhead(t);
       updateTrackFill(t);
@@ -1343,7 +1488,7 @@
       if (t >= totalDuration) {
         stopPlayback();
         updatePlayPauseButton();
-        setStatus('Done · Beat-synced edit ready');
+        setStatus('Done · Edit ready');
         return;
       }
       rafId = requestAnimationFrame(renderLoop);
@@ -1364,7 +1509,7 @@
       // Remove old beat markers + playhead (keep the fill element)
       waveformTrack.querySelectorAll('.beat-marker, .playhead').forEach(n => n.remove());
 
-      beatTimelineLabel.textContent = `${timestamps.length} CUTS`;
+      beatTimelineLabel.textContent = `${timestamps.length} DROPS`;
       telemetryBeats.textContent = timestamps.length;
       totalDuration = totalDur || 10;
 
@@ -1438,11 +1583,12 @@
       sourceVideo.muted = true;
       sourceVideo.playsInline = true;
       sourceVideo.webkitPlaysInline = true;
+      sourceVideo.loop = true;
       sourceVideo.preload = 'auto';
 
       viewportPlaceholder.style.display = 'none';
       stageVideoInput.style.display = 'none';   // stage is live now — taps toggle playback
-      frameBadge.textContent = 'RAW INPUT';
+      frameBadge.textContent = 'RAW';
       frameBadge.classList.remove('edited');
       liveTimer.textContent = '00:00.0';
 
@@ -1457,10 +1603,13 @@
 
         videoMeta = { duration: dur, width: sourceVideo.videoWidth, height: sourceVideo.videoHeight };
         cropData = computeCrop7201280(videoMeta, avgSubjectX);
-        totalDuration = dur;
 
-        // Re-map preset beats onto the known clip length
-        if (audioMode === 'preset') refreshPresetBeats();
+        // Keep an already-analyzed uploaded track; otherwise map preset drops
+        // onto the known clip length.
+        if (!(audioMode === 'upload' && currentAudioBuffer)) {
+          totalDuration = dur;
+          refreshPresetBeats();
+        }
 
         setStatus('Media loaded · Ready to analyze');
       };
@@ -1506,7 +1655,7 @@
       document.querySelectorAll('.stage-video-input').forEach(i => { i.value = ''; i.style.display = ''; });
       stageVideoInput.style.display = '';
       viewportPlaceholder.style.display = '';
-      frameBadge.textContent = 'RAW INPUT';
+      frameBadge.textContent = 'RAW';
       frameBadge.classList.remove('edited');
       liveTimer.textContent = '00:00.0';
 
@@ -1515,11 +1664,13 @@
       currentTimeline = 0;
       totalDuration = 0;
       cropData = null;
-      punchScale = 1;
-      flashAlpha = 0;
+      beatFxAt = -10;
+      beatFxStrength = 1;
+      velocityDropUntil = 0;
+      currentPlaybackRate = 1;
 
       renderWaveformTimeline([], 10);
-      beatTimelineLabel.textContent = '0 CUTS';
+      beatTimelineLabel.textContent = '0 DROPS';
       telemetryBeats.textContent = '0';
 
       downloadBtn.disabled = true;
@@ -1568,9 +1719,10 @@
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       customAudioFile = file;
+      setAudioMode('upload');
 
       audioFileName.textContent = file.name;
-      audioFileMeta.textContent = `${(file.size / (1024 * 1024)).toFixed(1)} MB · DETECTING TRANSIENTS…`;
+      audioFileMeta.textContent = `${(file.size / (1024 * 1024)).toFixed(1)} MB · DETECTING BASS DROPS…`;
       audioDropzone.classList.add('has-files');
 
       try {
@@ -1581,8 +1733,8 @@
         timelineMode = 'music';
         vadSegments = [];
         renderWaveformTimeline(beats, totalDuration);
-        audioFileMeta.textContent = `${(file.size / (1024 * 1024)).toFixed(1)} MB · ${beats.length} TRANSIENTS FOUND`;
-        setStatus(`Audio mapped · ${beats.length} cuts detected`);
+        audioFileMeta.textContent = `${(file.size / (1024 * 1024)).toFixed(1)} MB · ${beats.length} DROPS FOUND`;
+        setStatus(`Audio mapped · ${beats.length} impactful drops`);
       } catch (err) {
         console.error(err);
         audioFileMeta.textContent = 'DECODE FAILED — TRY A DIFFERENT FILE';
@@ -1655,7 +1807,7 @@
 
         // 2) Beat map
         if (audioMode === 'upload') {
-          setStatus('Detecting bass transients…');
+          setStatus('Detecting heavy bass drops…');
           const pkg = await analyzeUploadedAudio(customAudioFile);
           currentAudioBuffer = pkg.audioBuffer;
           beats = pkg.beats;
@@ -1681,16 +1833,19 @@
         currentTimeline = 0;
         nextBeatIndex = 0;
         panCurrentX = null;
-        punchScale = 1;
-        flashAlpha = 0;
+        beatFxAt = -10;
+        beatFxStrength = 1;
+        velocityDropUntil = 0;
+        currentPlaybackRate = 1;
+        sourceVideo.loop = true;
 
-        frameBadge.textContent = 'EDITED OUTPUT';
+        frameBadge.textContent = 'EDITED';
         frameBadge.classList.add('edited');
 
         downloadBtn.disabled = false;
         downloadBtnText.textContent = 'Export';
 
-        setStatus('Done · Beat-synced edit ready');
+        setStatus('Done · Edit ready');
         startPlayback(0);
       } catch (err) {
         console.error(err);
@@ -1711,13 +1866,17 @@
         return;
       }
       if (isPlaying) stopPlayback();
+      if (typeof MediaRecorder === 'undefined') {
+        setStatus('Export not supported in this browser');
+        return;
+      }
 
       setupGraph();
 
       let mime = 'video/webm';
       if (MediaRecorder.isTypeSupported('video/mp4')) mime = 'video/mp4';
       else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) mime = 'video/webm;codecs=vp8,opus';
-      const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+      let ext = mime.includes('mp4') ? 'mp4' : 'webm';
 
       downloadBtn.disabled = true;
       downloadBtnText.textContent = 'Exporting 0%';
@@ -1738,11 +1897,23 @@
         exportDest.stream.getAudioTracks().forEach((t) => combined.addTrack(t));
       }
 
-      const recorder = new MediaRecorder(combined, { mimeType: mime, videoBitsPerSecond: 4000000 });
+      let recorder;
+      try {
+        recorder = new MediaRecorder(combined, {
+          mimeType: mime,
+          videoBitsPerSecond: 2500000,
+          audioBitsPerSecond: 128000
+        });
+      } catch (e) {
+        recorder = new MediaRecorder(combined);
+      }
+      if (recorder.mimeType) mime = recorder.mimeType;
+      ext = mime.includes('mp4') ? 'mp4' : 'webm';
+
       const chunks = [];
       recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
       const donePromise = new Promise((res) => { recorder.onstop = res; });
-      recorder.start(100);
+      recorder.start(250);
 
       currentTimeline = 0;
       startPlayback(0);
@@ -1781,7 +1952,8 @@
     // INIT — Phonk Drift 130 BPM active by default
     // ============================================================
     refreshPresetBeats();       // builds beats + fills timeline + counters
-    setStatus('Ready · Phonk Drift 130 BPM active');
+    sourceVideo.loop = true;
+    setStatus('Ready · Phonk Drift 130 BPM');
     updateVideosUI();
     updatePlayPauseButton();
   </script>
